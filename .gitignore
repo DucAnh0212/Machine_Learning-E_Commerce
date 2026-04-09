@@ -1,0 +1,16 @@
+.venv/
+venv/
+env/
+
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+.env
+secret_keys.json
+
+.vscode/
+.idea/
+*.swp
+app/ml/*.pkl
