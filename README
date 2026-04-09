@@ -1,1 +1,103 @@
+# Chi tiết tác dụng của từng file nhằm kết nối csdl
+- requirements.txt: chứa danh sách toàn bộ các thư viện Python cần thiết để chạy dự án. Nó bao gồm các thư viện cho Web Server (FastAPI, Uvicorn), kết nối cơ sở dữ liệu (SQLAlchemy, pyodbc), xử lý dữ liệu (Pandas, Numpy) và học máy (Scikit-learn). Cần thiết phải cài đặt nhằm có thể chạy được đầy đủ tất cả các file 
+- .env: lưu trữ các biến môi trường, đặc biệt là thông tin kết nối đến SQL Server (Tên Server, Tên Database). Khởi tạo file này ngang hàng với requirement để có thể kết nối tới csdl nhằm bơm dữ liệu cũng như lấy dữ liệu để huấn luyện mô hình
+
+# Database Settings
+DB_SERVER=localhost  # tên server hiển thị lúc SSMS
+DB_NAME=TTCS   # Tên Database 
+SQLALCHEMY_DATABASE_URL = f"mssql+pyodbc://{SERVER}/{DATABASE}?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
+=> Tinh chỉnh theo setting hệ quản trị csdl xử dụng (mẫu ở đây là SQL Server)
+
+- test_db_connection.py: File kiểm tra kết nối csdld
+
+# Các scripts nhằm tạo dữ liệu ảo kết hợp các dataset có sẵn 
+- seed_phase_1.py: 
+  + Mục đích nhằm tạo dữ liệu cho các bảng mà không phụ thuộc vàp bất kì bảng nào khác
+  + Sử dụng thư viện Faker 
+- seed_phase_2.py:
+  + Xây dựng kho hàng và định tuyến cửa hàng 
+  + Trích xuất các tập tin csv thực tế và thực hiện quá trình ETL nhằm fit dữ liệu vào csdl. Đồng thời setup sẵn 1 số user nhất định làm seller và tạo Tags cho từng sản phẩm
+- seed_phase_3.py:
+  + Tạo các dữ liệu tương tác, quan trọng cho các mô hình Machine Learning
+=> Bắt buộc phải chạy dần dần các seed theo thứ tự nhằm đảm bảo tính liên kết và nhất quán dữ liệu 
+
+# Các models học máy và server API cho từng model 
+- Cả 3 file mô hình học máy đều cần phải được chạy trước khi được đưa vào sử dụng, lý do là vì đầu ra của cả 3 mô hình đều là file .pkl, file này lưu dữ "bộ não" của mô hình
+- Đo file pkl có kích thước rất lớn (>100 Mb) nên không thể đưa lên github, nhưng khi chạy mô hình, chúng sẽ được sinh ra và lưu trữ trong trong app/ml, khi API được gọi thì sẽ là dùng chính những file .pkl này 
+
+- svd_api.py: API server cho mô hình học máy SVD - Collaborative Filtering; Đề xuất danh sách sản phẩm dành riêng cho từng người dùng dựa trên lịch sử đánh giá của họ và những người dùng có sở thích tương đồng. Mô hình tự động nhận diện và xử lý "Cold Start" (người dùng mới) bằng cách trả về danh sách các sản phẩm phổ biến nhất. Mô hình cũng tự động loại bỏ các sản phẩm người dùng đã mua khỏi danh sách gợi ý.
+  + API 1: Lấy danh sách gợi ý
+    * Endpoint: GET /recommend/{user_id}
+    * Tham số đầu vào: 
+      => user_id (int): ID của người dùng đang đăng nhập.
+      => top_n (int, tùy chọn): Số lượng sản phẩm muốn AI trả về (mặc định là 10).  
+    * Kết quả trả về (mẫu):
+    {
+      "success": true,
+      "user_id": 105,
+      "data": [
+          {
+              "product_id": 5021,
+              "ai_score": 4.85
+          },
+          {
+              "product_id": 120,
+              "ai_score": 4.62
+          }
+      ]
+  }
+
+  + API 2: Cập nhật lại mô hình
+    * Endpoint: POST /reload-model
+    * Được gọi tự động bởi tập tin 1_train_svd.py sau khi hệ thống hoàn tất việc huấn luyện lại dữ liệu mới. API này giúp Server nạp lại tập tin .pkl vào RAM mà không cần phải khởi động lại (restart) toàn bộ dịch vụ web.
+
+- pca_knn_api.py: API cho mô hình PCA + KNN; Cung cấp danh sách các sản phẩm có đặc tính (Tên, Thẻ, Mô tả, Phân khúc giá) giống với sản phẩm khách hàng đang xem. Dịch vụ này tích hợp "Bộ lọc mềm" (Soft Filter), yêu cầu các sản phẩm láng giềng phải có mức độ trùng khớp danh mục tối thiểu 40% so với sản phẩm gốc, đảm bảo tính logic về mặt nghiệp vụ E-commerce.
+  + Endpoint: GET /similar/{product_id}
+  + Tham số đầu vào: 
+    * product_id (int): ID của sản phẩm đang được hiển thị trên giao diện chi tiết.
+    * top_n (int, tùy chọn): Số lượng sản phẩm tương tự muốn lấy (mặc định là 10).
+  + Kết quả trả về (mẫu):
+  {
+    "success": true,
+    "product_id": 892,
+    "data": [
+        {
+            "product_id": 895,
+            "ai_score": 98.5
+        },
+        {
+            "product_id": 1024,
+            "ai_score": 92.1
+        }
+    ]
+}
+
+- review_classifier_api.py: API cho mô hình học máy chống gian lận; Ngay khi có một đánh giá mới được gửi lên, Web Backend cần đẩy thông tin qua API này. Mô hình Logistic Regression kết hợp xử lý ngôn ngữ tự nhiên (NLP) sẽ phân tích từ ngữ và kết hợp với hành vi lưu vết (IP, Thiết bị, Lịch sử đơn hàng) để ra quyết định kiểm duyệt.
+  + Endpoint: POST /moderate-review
+  + Tham số đầu vào: bắt buộc phải cung cấp đủ các trường dữ liệu:
+  {
+      "review_id": 15092,
+      "comment": "Sản phẩm tuyệt vời, giao hàng cực kỳ nhanh chóng!",
+      "rating": 5,
+      "has_order": 1, 
+      "ip_frequency": 3, 
+      "device_frequency": 1
+  }
+  * Lưu ý: has_order truyền giá trị 1 nếu đánh giá này thuộc về một đơn hàng đã mua thật, ngược lại truyền 0. Các biến ip_frequency và device_frequency yêu cầu Backend thực hiện lệnh đếm truy vấn (COUNT) trong cơ sở dữ liệu đối với địa chỉ IP/DeviceID đó trong ngày hiện tại trước khi gửi sang hệ thống AI
+  + Kết quả trả về (mẫu):  Dịch vụ sử dụng ngưỡng (Threshold) là 60%. Nếu xác suất gian lận từ 60% trở lên, hệ thống sẽ yêu cầu ẩn bài đánh giá. 
+  {
+    "success": true,
+    "review_id": 15092,
+    "is_fake": false,
+    "fake_probability": 15.4,
+    "action": "publish"
+  }
+  * Hướng dẫn tích hợp cho Backend: Dựa vào trường "action", Backend sẽ tiến hành cập nhật cờ (flag) trong cơ sở dữ liệu.
+    => Trả về "publish": Cập nhật IsFake = 0 và cho phép hiển thị lên web.
+    => Trả về "hide": Cập nhật IsFake = 1 và đưa vào danh sách đen chờ xét duyệt lại.
+  * Khi người dùng viết 1 review mới, review đó sẽ được chấp nhận, nhưng sau đó sẽ được đẩy vào hàng chờ, nhằm chờ mô hình lọc và đánh giá từ đó đưa ra quyết định hiển thị hay không. Bên cạnh đó cũng sẽ giúp mô hình xử lý từ từ, không bị ngốn quá nhiều RAM 
+  
+
+
+
 
