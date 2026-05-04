@@ -251,4 +251,5 @@ CREATE TABLE Search_History (
 );
 GO
 
-*  Tiếp tục chạy lại các seed nhằm bơm dữ liệu vào csdl (đảm bảo sửa lại cấu trúc csdl và clean data cũ)
+* Đã thêm seed 4 trong scripts và update seed 1 2 3
+* Tiếp tục chạy lại các seed nhằm bơm dữ liệu vào csdl, từ 1 - 4 (đảm bảo sửa lại cấu trúc csdl và clean data cũ)
