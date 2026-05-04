@@ -130,24 +130,7 @@ def run_phase_1(num_users=15000):
             """), {"t": tag})
         db.commit()
 
-        # 3. BẢNG Vouchers 
-        vouchers_data = []
-        for _ in range(250):
-            start_date = fake.date_time_between(start_date='-1y', end_date='now')
-            vouchers_data.append({
-                "VoucherType": random.choice(['Shop', 'Platform', 'Shipping']),
-                "DiscountValue": round(random.uniform(5.0, 50.0), 2),
-                "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"),
-                "EndDate": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
-                "Status": "Active"
-            })
-        
-        voucher_query = "INSERT INTO Vouchers (VoucherType, DiscountValue, StartDate, EndDate, Status) VALUES (:VoucherType, :DiscountValue, :StartDate, :EndDate, :Status)"
-        for i in range(0, len(vouchers_data), 100):
-            db.execute(text(voucher_query), vouchers_data[i:i+100])
-        db.commit()
-
-        # 4. BẢNG Users
+        # 3. BẢNG Users
         hashed_pwd = pwd_context.hash("123456")
         email_counter = {}
         batch_limit = 1000 
@@ -189,6 +172,7 @@ def run_phase_1(num_users=15000):
         db.rollback()
         raise e
     finally:
+        print(">>> HOÀN TẤT PHASE 1!")
         db.close()
 
 if __name__ == "__main__":
