@@ -246,7 +246,9 @@ def run_phase_3():
         db.commit()
     except Exception as e:
         db.rollback(); raise e
-    finally: db.close()
+    finally: 
+        print(">>> HOÀN TẤT PHASE 3!")
+        db.close()
 
 if __name__ == "__main__":
     run_phase_3()
