@@ -5,6 +5,7 @@ import os
 import re
 import itertools
 import unidecode
+from datetime import timedelta
 from faker import Faker
 from sqlalchemy import text
 from app.core.database_connection import SessionLocal
@@ -278,7 +279,53 @@ def run_phase_2():
                             "d": f"Chuyên cung cấp {vn_cat_name} chính hãng toàn cầu.", 
                             "r": round(random.uniform(3.0, 5.0), 2)})
         db.commit()
-
+        
+        # TẠO VOUCHER
+        print(">>> Đang sinh Vouchers cho từng Shop và Sàn...")
+        vouchers_data = []
+        
+        # A. Voucher dành riêng cho từng Shop (1 đến 8 mã)
+        for sid in seller_ids:
+            num_vouchers = random.randint(1, 8)
+            for _ in range(num_vouchers):
+                discount_val = round(random.uniform(10.0, 55.0), 1)
+                prefix = random.choice(["GIAMGIA", "SALE"])
+                rounded_int = round(discount_val)
+                # Đảm bảo mã unique bằng cách nối thêm ký tự ngẫu nhiên
+                v_code = f"{prefix}{rounded_int}%_{fake.unique.lexify(text='????').upper()}"
+                
+                start_date = fake.date_time_between(start_date='-6m', end_date='now')
+                vouchers_data.append({
+                    "VoucherCode": v_code, "ShopID": sid, "VoucherType": "Shop", "DiscountValue": discount_val, 
+                    "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"), 
+                    "EndDate": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
+                    "Status": "Active"
+                })
+                
+        # B. Voucher của Sàn (Platform) & Vận chuyển (Shipping)
+        for _ in range(150):
+            discount_val = round(random.uniform(10.0, 55.0), 1)
+            v_type = random.choice(['Platform', 'Shipping'])
+            prefix = "FREESHIP" if v_type == 'Shipping' else random.choice(["GIAMGIA", "SALE"])
+            rounded_int = round(discount_val)
+            v_code = f"{prefix}{rounded_int}%_{fake.unique.lexify(text='????').upper()}"
+            
+            start_date = fake.date_time_between(start_date='-6m', end_date='now')
+            vouchers_data.append({
+                "VoucherCode": v_code, "ShopID": None, "VoucherType": v_type, "DiscountValue": discount_val, 
+                "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"), 
+                "EndDate": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
+                "Status": "Active"
+            })
+            
+        voucher_query = """
+            INSERT INTO Vouchers (VoucherCode, ShopID, VoucherType, DiscountValue, StartDate, EndDate, Status) 
+            VALUES (:VoucherCode, :ShopID, :VoucherType, :DiscountValue, :StartDate, :EndDate, :Status)
+        """
+        for i in range(0, len(vouchers_data), 500):
+            db.execute(text(voucher_query), vouchers_data[i:i+500])
+        db.commit()
+        
         # SINH ĐỊA CHỈ
         print(">>> Đang tạo địa chỉ cho TẤT CẢ User...")
         for uid in user_ids:
