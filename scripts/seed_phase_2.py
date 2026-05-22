@@ -260,73 +260,55 @@ def run_phase_2():
 
         # Tạo Shop
         for uid in user_ids:
-            db.execute(text("""
-                IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r)
-                INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)
-            """), {"u": uid, "r": role_map['Customer']})
-            
+            db.execute(text("IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r) INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)"), {"u": uid, "r": role_map['Customer']})
             if uid in seller_ids:
                 assigned_cat = random.choice(main_cats_list)
                 shop_specialized_map[uid] = assigned_cat
-                db.execute(text("""
-                    IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r)
-                    INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)
-                """), {"u": uid, "r": role_map['Seller']})
+                db.execute(text("IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r) INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)"), {"u": uid, "r": role_map['Seller']})
                 
                 vn_cat_name = MAIN_CAT_TRANSLATE[assigned_cat]
-                db.execute(text("IF NOT EXISTS (SELECT 1 FROM Shops WHERE ShopID = :s) INSERT INTO Shops (ShopID, ShopName, Description, Rating) VALUES (:s, :n, :d, :r)"),
-                           {"s": uid, "n": f"Cửa hàng {vn_cat_name} {fake.last_name()}", 
-                            "d": f"Chuyên cung cấp {vn_cat_name} chính hãng toàn cầu.", 
-                            "r": round(random.uniform(3.0, 5.0), 2)})
+                db.execute(text("IF NOT EXISTS (SELECT 1 FROM Shops WHERE ShopID = :s) INSERT INTO Shops (ShopID, ShopName, Description, Rating, FollowerCount) VALUES (:s, :n, :d, :r, 0)"),
+                           {"s": uid, "n": f"Cửa hàng {vn_cat_name} {fake.last_name()}", "d": f"Chuyên cung cấp {vn_cat_name} chính hãng.", "r": 0.0})
         db.commit()
         
-        # TẠO VOUCHER
+        # 2. TẠO VOUCHER (Logic chuẩn: ShopID)
         print(">>> Đang sinh Vouchers cho từng Shop và Sàn...")
         vouchers_data = []
-        
-        # A. Voucher dành riêng cho từng Shop (1 đến 8 mã)
         for sid in seller_ids:
             num_vouchers = random.randint(1, 8)
             for _ in range(num_vouchers):
                 discount_val = round(random.uniform(10.0, 55.0), 1)
                 prefix = random.choice(["GIAMGIA", "SALE"])
                 rounded_int = round(discount_val)
-                # Đảm bảo mã unique bằng cách nối thêm ký tự ngẫu nhiên
                 v_code = f"{prefix}{rounded_int}%_{fake.unique.lexify(text='????').upper()}"
-                
-                start_date = fake.date_time_between(start_date='-6m', end_date='now')
+                start_date = fake.date_time_between(start_date='-1m', end_date='now')
                 vouchers_data.append({
                     "VoucherCode": v_code, "ShopID": sid, "VoucherType": "Shop", "DiscountValue": discount_val, 
                     "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"), 
-                    "EndDate": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
+                    "EndDate": (start_date + timedelta(days=random.randint(90, 180))).strftime("%Y-%m-%d %H:%M:%S"),
                     "Status": "Active"
                 })
                 
-        # B. Voucher của Sàn (Platform) & Vận chuyển (Shipping)
         for _ in range(150):
             discount_val = round(random.uniform(10.0, 55.0), 1)
             v_type = random.choice(['Platform', 'Shipping'])
             prefix = "FREESHIP" if v_type == 'Shipping' else random.choice(["GIAMGIA", "SALE"])
             rounded_int = round(discount_val)
             v_code = f"{prefix}{rounded_int}%_{fake.unique.lexify(text='????').upper()}"
-            
-            start_date = fake.date_time_between(start_date='-6m', end_date='now')
+            start_date = fake.date_time_between(start_date='-1m', end_date='now')
             vouchers_data.append({
                 "VoucherCode": v_code, "ShopID": None, "VoucherType": v_type, "DiscountValue": discount_val, 
                 "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"), 
-                "EndDate": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
+                "EndDate": (start_date + timedelta(days=random.randint(90, 180))).strftime("%Y-%m-%d %H:%M:%S"),
                 "Status": "Active"
             })
             
-        voucher_query = """
-            INSERT INTO Vouchers (VoucherCode, ShopID, VoucherType, DiscountValue, StartDate, EndDate, Status) 
-            VALUES (:VoucherCode, :ShopID, :VoucherType, :DiscountValue, :StartDate, :EndDate, :Status)
-        """
+        voucher_query = "INSERT INTO Vouchers (VoucherCode, ShopID, VoucherType, DiscountValue, StartDate, EndDate, Status) VALUES (:VoucherCode, :ShopID, :VoucherType, :DiscountValue, :StartDate, :EndDate, :Status)"
         for i in range(0, len(vouchers_data), 500):
             db.execute(text(voucher_query), vouchers_data[i:i+500])
         db.commit()
-        
-        # SINH ĐỊA CHỈ
+
+        # 3. SINH ĐỊA CHỈ
         print(">>> Đang tạo địa chỉ cho TẤT CẢ User...")
         for uid in user_ids:
             if random.random() < 0.9:
@@ -346,6 +328,7 @@ def run_phase_2():
                        {"u": uid, "n": info["name"], "p": info["phone"], "pv": pv, "dt": dt, "w": w, "da": da})
         db.commit()
 
+        # 4. SINH SẢN PHẨM
         print(">>> Đang quét dữ liệu sản phẩm từ TẤT CẢ các file CSV...")
         all_products_pool = []
         seen_names = set()
@@ -373,23 +356,14 @@ def run_phase_2():
                         p_name = row.get(meta['name'], '').strip()
                         if p_name and p_name not in seen_names:
                             seen_names.add(p_name)
-                            
                             current_cat = meta['cat']
-                            # Vẫn giữ logic cũ: Nếu đồ Fashion mà có tag sport thì đổi thành Sport
                             if current_cat == 'Fashion':
                                 usage_str = str(row.get('usage', '')).lower()
                                 name_check = p_name.lower()
                                 if 'sports' in usage_str or any(k in name_check for k in ['sport', 'run', 'gym', 'active', 'sneaker']):
                                     current_cat = 'Sports'
-
-                            all_products_pool.append({
-                                'name': p_name, 
-                                'brand': row.get(meta['brand'], 'Generic'), 
-                                'cat': current_cat, 
-                                'desc': row.get(meta['desc'], '')
-                            })
+                            all_products_pool.append({'name': p_name, 'brand': row.get(meta['brand'], 'Generic'), 'cat': current_cat, 'desc': row.get(meta['desc'], '')})
                             count_from_file += 1
-                        
                         if count_from_file >= 2000: break
                 print(f"  -> Đã trích xuất {count_from_file} sản phẩm từ {file}")
 
@@ -411,15 +385,12 @@ def run_phase_2():
             main_cat = item['cat']
             matching_sellers = [sid for sid, scat in shop_specialized_map.items() if scat == main_cat]
             final_sid = random.choice(matching_sellers if matching_sellers else seller_ids)
-
             main_cat_vn = MAIN_CAT_TRANSLATE.get(main_cat, 'Khác')
             sub_cat_vn = smart_categorize(item['name'], main_cat)
             
-            target_cat_names = [main_cat_vn, sub_cat_vn]
-
+            target_cat_names = list(set([main_cat_vn, sub_cat_vn]))
             brand_name = str(item['brand']).strip()
-            if brand_name and brand_name.lower() not in ['generic', 'none', 'no brand', 'null', '', 'unknown', 'n/a']:
-                target_cat_names.append(brand_name.upper())
+            if brand_name and brand_name.lower() not in ['generic', 'none', 'no brand', 'null', '', 'unknown', 'n/a']: target_cat_names.append(brand_name.upper())
 
             if random.random() < 0.3:
                 if "Nam" in sub_cat_vn: target_cat_names.append("Sản Phẩm Nam Giới")
@@ -433,20 +404,17 @@ def run_phase_2():
                 context_pool = ["Hàng Mới Về", "Top Bán Chạy", "Hàng Chính Hãng", "Lựa Chọn Của Shop"]
                 target_cat_names.append(random.choice(context_pool))
             
-            target_cat_names = list(set(target_cat_names))
-            
-            target_cat_ids = []
-            for c_name in target_cat_names:
-                cid = get_or_create_category(db, cat_cache, c_name)
-                target_cat_ids.append(cid)
+            target_cat_ids = [get_or_create_category(db, cat_cache, c_name) for c_name in set(target_cat_names)]
 
             cleaned_csv = clean_desc_conflict(item['desc'], main_cat)
             gen_phrase = random.choice(ENRICHED_DESC.get(main_cat, ["Sản phẩm chất lượng cao."]))
             final_desc = clean_and_format_desc(cleaned_csv, gen_phrase)
 
-            res = db.execute(text("""INSERT INTO Products (ProductName, ShopID, Brand, Description) 
-                                   OUTPUT INSERTED.ProductID VALUES (:n, :s, :b, :d)"""), 
-                                   {"n": str(item['name'])[:200], "s": final_sid, "b": brand_name[:100], "d": final_desc[:1000]})
+            init_rating = round(random.uniform(3.5, 5.0), 1)
+
+            res = db.execute(text("""INSERT INTO Products (ProductName, ShopID, Brand, Description, Rating) 
+                                   OUTPUT INSERTED.ProductID VALUES (:n, :s, :b, :d, :r)"""), 
+                                   {"n": str(item['name'])[:200], "s": final_sid, "b": brand_name[:100], "d": final_desc[:1000], "r": init_rating})
             pid = res.fetchone()[0]
 
             for cid in target_cat_ids:
@@ -454,16 +422,13 @@ def run_phase_2():
 
             base_min, base_max = PRICE_RANGES.get(main_cat, PRICE_RANGES['Default'])
             base_price = round(random.uniform(base_min, base_max), -4)
-
             attr_key = main_cat if main_cat in ATTR_MAP else 'Default'
             attrs = ATTR_MAP[attr_key]
-            
             chosen_combos = []
             
             if main_cat in ['Fashion', 'Sports']:
                 num_colors = random.randint(1, min(2, len(attrs['colors'])))
                 selected_colors = random.sample(attrs['colors'], num_colors)
-                
                 for clr in selected_colors:
                     for sz in attrs['sizes']:
                         chosen_combos.append((sz, clr))
@@ -477,7 +442,6 @@ def run_phase_2():
                 s_sz = sanitize_sku_part(sz)
                 s_cl = sanitize_sku_part(cl)
                 sku = f"SKU-{pid}-{s_sz}-{s_cl}"
-                
                 db.execute(text("""INSERT INTO Product_Variants (ProductID, Size, Color, Price, StockQuantity, SKU, Status)
                                    VALUES (:p, :sz, :cl, :pr, :st, :s, 'Active')"""),
                                    {"p": pid, "sz": sz, "cl": cl, "pr": variant_price, "st": random.randint(10, 500), "s": sku})
@@ -485,7 +449,6 @@ def run_phase_2():
             final_tags = set()
             spec_keywords = SPECIFIC_TAG_MAP.get(sub_cat_vn, [])
             relevant_tag_ids = [tag_name_to_id[k] for k in spec_keywords if k in tag_name_to_id]
-            
             if relevant_tag_ids:
                 num_to_pick = random.choice([2, 3, 4]) 
                 chosen_special = random.sample(relevant_tag_ids, min(len(relevant_tag_ids), num_to_pick))
