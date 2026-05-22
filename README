@@ -1,7 +1,6 @@
-* 4/5/2026: chỉnh sửa bảng Voucher kết hợp với việc thêm bảng User_Voucher còn thiếu, cải thiện lạicaaus trúc của csdl 
-USE TTCS;
-GO
-
+* 22/5/2026 sửa lại cấu trúc db nhằm xử lý logic follower của shop, rating của sản phẩm + 8 bảng sản phẩm theo danh mục nổi bật (thay giáo dục = thời trang nam, rất xin lỗi LA =)))) )
+* Chỉnh sửa logic lại seed 2 và seed 4 nhằm phục vụ việc bơm logic cho cấu trúc db mới
+* Logic ảnh tạm thời chưa hoàn thiện, sẽ hoàn thành sau 
 CREATE TABLE Users (
     UserID INT IDENTITY(1,1) PRIMARY KEY,
     FullName NVARCHAR(100) NOT NULL,
@@ -11,7 +10,7 @@ CREATE TABLE Users (
     Birthday DATE,
     Gender NVARCHAR(10),
     FollowerCount INT DEFAULT 0,
-    Status NVARCHAR(20) DEFAULT 'Active', -- 'Active', 'Inactive'
+    Status NVARCHAR(20) DEFAULT 'Active',
     LastLoginDate DATETIME,
     CreatedAt DATETIME DEFAULT GETDATE(),
     UpdatedAt DATETIME DEFAULT GETDATE(),
@@ -20,12 +19,12 @@ CREATE TABLE Users (
 
 CREATE TABLE Roles (
     RoleID INT IDENTITY(1,1) PRIMARY KEY,
-    RoleName NVARCHAR(50) NOT NULL -- 'Customer', 'Seller'
+    RoleName NVARCHAR(50) NOT NULL
 );
 
 CREATE TABLE User_Roles (
-    UserID INT FOREIGN KEY REFERENCES Users(UserID),
-    RoleID INT FOREIGN KEY REFERENCES Roles(RoleID),
+    UserID INT FOREIGN KEY REFERENCES Users(UserID) ON DELETE CASCADE,
+    RoleID INT FOREIGN KEY REFERENCES Roles(RoleID) ON DELETE CASCADE,
     PRIMARY KEY (UserID, RoleID)
 );
 
@@ -34,14 +33,22 @@ CREATE TABLE Shops (
     ShopName NVARCHAR(150) NOT NULL,
     Description NVARCHAR(MAX),
     Rating DECIMAL(3,2) DEFAULT 0.0,
+    FollowerCount INT DEFAULT 0, 
     CreatedAt DATETIME DEFAULT GETDATE(),
     UpdatedAt DATETIME DEFAULT GETDATE(),
     DeletedAt DATETIME NULL
 );
 
+CREATE TABLE Shop_Followers (
+    UserID INT FOREIGN KEY REFERENCES Users(UserID),
+    ShopID INT FOREIGN KEY REFERENCES Shops(ShopID),
+    FollowedAt DATETIME DEFAULT GETDATE(),
+    PRIMARY KEY (UserID, ShopID) 
+);
+
 CREATE TABLE Addresses (
     AddressID INT IDENTITY(1,1) PRIMARY KEY,
-    UserID INT FOREIGN KEY REFERENCES Users(UserID),
+    UserID INT FOREIGN KEY REFERENCES Users(UserID) ON DELETE CASCADE,
     ReceiverName NVARCHAR(100),
     Phone NVARCHAR(20),
     Province NVARCHAR(50),
@@ -68,20 +75,21 @@ CREATE TABLE Products (
     ShopID INT FOREIGN KEY REFERENCES Shops(ShopID),
     Brand NVARCHAR(100),
     Description NVARCHAR(MAX),
+    Rating DECIMAL(3,2) DEFAULT 0.0,
     CreatedAt DATETIME DEFAULT GETDATE(),
     UpdatedAt DATETIME DEFAULT GETDATE(),
     DeletedAt DATETIME NULL
 );
 
 CREATE TABLE Product_Categories_Map (
-    ProductID INT FOREIGN KEY REFERENCES Products(ProductID),
-    CategoryID INT FOREIGN KEY REFERENCES Categories(CategoryID),
+    ProductID INT FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE,
+    CategoryID INT FOREIGN KEY REFERENCES Categories(CategoryID) ON DELETE CASCADE,
     PRIMARY KEY (ProductID, CategoryID)
 );
 
 CREATE TABLE Product_Images (
     ImageID INT IDENTITY(1,1) PRIMARY KEY,
-    ProductID INT FOREIGN KEY REFERENCES Products(ProductID),
+    ProductID INT FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE,
     ImageURL NVARCHAR(MAX) NOT NULL,
     IsMain BIT DEFAULT 0,
     CreatedAt DATETIME DEFAULT GETDATE(),
@@ -90,7 +98,7 @@ CREATE TABLE Product_Images (
 
 CREATE TABLE Product_Variants (
     VariantID INT IDENTITY(1,1) PRIMARY KEY,
-    ProductID INT FOREIGN KEY REFERENCES Products(ProductID),
+    ProductID INT FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE,
     Size NVARCHAR(50),
     Color NVARCHAR(50),
     Price DECIMAL(18,2) NOT NULL,
@@ -108,20 +116,20 @@ CREATE TABLE Tags (
 );
 
 CREATE TABLE Product_Tag_Map (
-    ProductID INT FOREIGN KEY REFERENCES Products(ProductID),
-    TagID INT FOREIGN KEY REFERENCES Tags(TagID),
+    ProductID INT FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE,
+    TagID INT FOREIGN KEY REFERENCES Tags(TagID) ON DELETE CASCADE,
     PRIMARY KEY (ProductID, TagID)
 );
 
 CREATE TABLE Carts (
     CartID INT IDENTITY(1,1) PRIMARY KEY,
-    UserID INT FOREIGN KEY REFERENCES Users(UserID)
+    UserID INT FOREIGN KEY REFERENCES Users(UserID) ON DELETE CASCADE
 );
 
 CREATE TABLE Cart_Items (
     CartItemID INT IDENTITY(1,1) PRIMARY KEY,
-    CartID INT FOREIGN KEY REFERENCES Carts(CartID),
-    VariantID INT FOREIGN KEY REFERENCES Product_Variants(VariantID),
+    CartID INT FOREIGN KEY REFERENCES Carts(CartID) ON DELETE CASCADE,
+    VariantID INT FOREIGN KEY REFERENCES Product_Variants(VariantID) ON DELETE CASCADE,
     Quantity INT DEFAULT 1
 );
 
@@ -132,15 +140,15 @@ CREATE TABLE Orders (
     AddressID INT FOREIGN KEY REFERENCES Addresses(AddressID),
     OrderDate DATETIME DEFAULT GETDATE(),
     TotalAmount DECIMAL(18,2),
-    PaymentStatus NVARCHAR(50) DEFAULT 'Unpaid', -- 'Unpaid', 'Paid', 'Refunded'
-    ShippingStatus NVARCHAR(50) DEFAULT 'Pending', -- 'Pending', 'Confirmed', 'Shipping', 'Completed', 'Cancelled'
+    PaymentStatus NVARCHAR(50) DEFAULT 'Unpaid',
+    ShippingStatus NVARCHAR(50) DEFAULT 'Pending',
     CreatedAt DATETIME DEFAULT GETDATE(),
     UpdatedAt DATETIME DEFAULT GETDATE()
 );
 
 CREATE TABLE Order_Items (
     OrderItemID INT IDENTITY(1,1) PRIMARY KEY,
-    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID),
+    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID) ON DELETE CASCADE,
     VariantID INT FOREIGN KEY REFERENCES Product_Variants(VariantID),
     Quantity INT NOT NULL,
     Price DECIMAL(18,2) NOT NULL
@@ -148,15 +156,15 @@ CREATE TABLE Order_Items (
 
 CREATE TABLE Payment_Methods (
     PaymentID INT IDENTITY(1,1) PRIMARY KEY,
-    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID),
-    Method NVARCHAR(50) NOT NULL, -- 'COD', 'Banking', 'Momo'...
+    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID) ON DELETE CASCADE,
+    Method NVARCHAR(50) NOT NULL,
     PaymentDate DATETIME,
     Amount DECIMAL(18,2) NOT NULL
 );
 
 CREATE TABLE Shipping_Units (
     ShipmentID INT IDENTITY(1,1) PRIMARY KEY,
-    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID),
+    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID) ON DELETE CASCADE,
     ShippingMethod NVARCHAR(100),
     ShippingFee DECIMAL(18,2) DEFAULT 0.0,
     TrackingNumber NVARCHAR(100),
@@ -180,8 +188,8 @@ CREATE TABLE Vouchers (
 );
 
 CREATE TABLE Order_Voucher (
-    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID),
-    VoucherID INT FOREIGN KEY REFERENCES Vouchers(VoucherID),
+    OrderID INT FOREIGN KEY REFERENCES Orders(OrderID) ON DELETE CASCADE,
+    VoucherID INT FOREIGN KEY REFERENCES Vouchers(VoucherID) ON DELETE CASCADE,
     PRIMARY KEY (OrderID, VoucherID)
 );
 
@@ -192,31 +200,32 @@ CREATE TABLE User_Vouchers (
     IsUsed BIT DEFAULT 0,
     SavedAt DATETIME DEFAULT GETDATE(),
     CONSTRAINT FK_UserVouchers_Users FOREIGN KEY (UserID) REFERENCES Users(UserID),
-    CONSTRAINT FK_UserVouchers_Vouchers FOREIGN KEY (VoucherID) REFERENCES Vouchers(VoucherID) ON DELETE CASCADE
+    CONSTRAINT FK_UserVouchers_Vouchers FOREIGN KEY (VoucherID) REFERENCES Vouchers(VoucherID) ON DELETE CASCADE,
+    CONSTRAINT UQ_User_Voucher UNIQUE (UserID, VoucherID) 
 );
 
 CREATE TABLE Reviews (
     ReviewID INT IDENTITY(1,1) PRIMARY KEY,
-    ProductID INT FOREIGN KEY REFERENCES Products(ProductID),
+    ProductID INT FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE,
     UserID INT FOREIGN KEY REFERENCES Users(UserID),
     OrderItemID INT FOREIGN KEY REFERENCES Order_Items(OrderItemID),
     Rating INT CHECK (Rating >= 1 AND Rating <= 5),
     Comment NVARCHAR(MAX),
     ReviewDate DATETIME DEFAULT GETDATE(),
-    IsFake BIT DEFAULT 0, -- Để train AI
+    IsFake BIT DEFAULT 0,
     UpdatedAt DATETIME DEFAULT GETDATE(),
     DeletedAt DATETIME NULL
 );
 
 CREATE TABLE Review_Metas (
-    ReviewID INT PRIMARY KEY FOREIGN KEY REFERENCES Reviews(ReviewID),
+    ReviewID INT PRIMARY KEY FOREIGN KEY REFERENCES Reviews(ReviewID) ON DELETE CASCADE,
     IP_Address NVARCHAR(50),
     DeviceID NVARCHAR(100)
 );
 
 CREATE TABLE Review_Reports (
     ReportID INT IDENTITY(1,1) PRIMARY KEY,
-    ReviewID INT FOREIGN KEY REFERENCES Reviews(ReviewID),
+    ReviewID INT FOREIGN KEY REFERENCES Reviews(ReviewID) ON DELETE CASCADE,
     ReporterID INT FOREIGN KEY REFERENCES Users(UserID),
     Reason NVARCHAR(255),
     CreatedAt DATETIME DEFAULT GETDATE()
@@ -225,8 +234,8 @@ CREATE TABLE Review_Reports (
 CREATE TABLE Notifications (
     NotificationID INT IDENTITY(1,1) PRIMARY KEY,
     SenderID INT FOREIGN KEY REFERENCES Users(UserID) NULL,
-    ReceiverID INT FOREIGN KEY REFERENCES Users(UserID),
-    Type NVARCHAR(50), -- 'AI_Recommend', 'OrderUpdate', 'DirectMessage', 'SystemAlert'
+    ReceiverID INT FOREIGN KEY REFERENCES Users(UserID) ON DELETE CASCADE,
+    Type NVARCHAR(50),
     Title NVARCHAR(200),
     Content NVARCHAR(MAX),
     RelatedLink NVARCHAR(MAX),
@@ -237,19 +246,25 @@ CREATE TABLE Notifications (
 
 CREATE TABLE User_Activities (
     ActivityID INT IDENTITY(1,1) PRIMARY KEY,
-    UserID INT FOREIGN KEY REFERENCES Users(UserID),
-    ProductID INT FOREIGN KEY REFERENCES Products(ProductID),
-    ActionType NVARCHAR(50), -- 'View', 'Search', 'AddToCart', 'Click'
+    UserID INT FOREIGN KEY REFERENCES Users(UserID) ON DELETE CASCADE,
+    ProductID INT FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE,
+    ActionType NVARCHAR(50),
     Timestamp DATETIME DEFAULT GETDATE()
 );
 
 CREATE TABLE Search_History (
     SearchID INT IDENTITY(1,1) PRIMARY KEY,
-    UserID INT FOREIGN KEY REFERENCES Users(UserID),
+    UserID INT FOREIGN KEY REFERENCES Users(UserID) ON DELETE CASCADE,
     Keyword NVARCHAR(200),
     CreatedAt DATETIME DEFAULT GETDATE()
 );
-GO
 
-* Đã thêm seed 4 trong scripts và update seed 1 2 3
-* Tiếp tục chạy lại các seed nhằm bơm dữ liệu vào csdl, từ 1 - 4 (đảm bảo sửa lại cấu trúc csdl và clean data cũ)
+CREATE TABLE UI_Best_Sellers (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_International (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_Womens_Fashion (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_Mens_Fashion (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_Beauty (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_Electronics (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_Sports (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+CREATE TABLE UI_Home_Appliances (ProductID INT PRIMARY KEY FOREIGN KEY REFERENCES Products(ProductID) ON DELETE CASCADE);
+GO
