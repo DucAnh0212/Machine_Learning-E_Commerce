@@ -11,7 +11,7 @@ def run_phase_4():
     try:
         print(">>> BẮT ĐẦU PHASE 4: Hoàn thiện dữ liệu Giỏ hàng, Thông báo và Đơn hàng...")
 
-        # 1. SEED BẢNG USER_VOUCHERS (Người dùng sưu tầm mã)
+        # 1. SEED BẢNG USER_VOUCHERS 
         print("1. Đang lưu Vouchers vào ví người dùng...")
         user_ids = [u[0] for u in db.execute(text("SELECT UserID FROM Users")).fetchall()]
         voucher_ids = [v[0] for v in db.execute(text("SELECT VoucherID FROM Vouchers WHERE Status = 'Active'")).fetchall()]
@@ -21,7 +21,11 @@ def run_phase_4():
             for vid in random.sample(voucher_ids, random.randint(2, 6)):
                 user_voucher_data.append({"u": uid, "v": vid, "dt": fake.date_time_between(start_date='-6m', end_date='now')})
         if user_voucher_data:
-            db.execute(text("INSERT INTO User_Vouchers (UserID, VoucherID, IsUsed, SavedAt) VALUES (:u, :v, 0, :dt)"), user_voucher_data)
+            for uv in user_voucher_data:
+                db.execute(text("""
+                    IF NOT EXISTS (SELECT 1 FROM User_Vouchers WHERE UserID = :u AND VoucherID = :v)
+                    INSERT INTO User_Vouchers (UserID, VoucherID, IsUsed, SavedAt) VALUES (:u, :v, 0, :dt)
+                """), uv)
         db.commit()
 
         # 2. SEED BẢNG ORDER_VOUCHER (Áp dụng mã chuẩn logic)
@@ -102,6 +106,87 @@ def run_phase_4():
                 report_data.append({"rv": rid, "rp": reporter_id, "rs": "Đánh giá Spam/Fake", "dt": fake.date_time_between(start_date='-2m', end_date='now')})
         if report_data:
             db.execute(text("INSERT INTO Review_Reports (ReviewID, ReporterID, Reason, CreatedAt) VALUES (:rv, :rp, :rs, :dt)"), report_data)
+        db.commit()
+        
+        # 7. CHỐNG FOLLOW ẢO VÀ CẬP NHẬT SHOP FOLLOWER
+        print("7. Đang tạo Follower thực tế cho Shop...")
+        shop_ids = [s[0] for s in db.execute(text("SELECT ShopID FROM Shops")).fetchall()]
+        follow_pairs = set()
+        follow_data = []
+        for uid in random.sample(user_ids, min(5000, len(user_ids))):
+            for sid in random.sample(shop_ids, random.randint(1, 10)):
+                if (uid, sid) not in follow_pairs:
+                    follow_pairs.add((uid, sid))
+                    follow_data.append({"u": uid, "s": sid})
+        
+        if follow_data:
+            db.execute(text("INSERT INTO Shop_Followers (UserID, ShopID) VALUES (:u, :s)"), follow_data)
+        
+        # Cập nhật số Follower thực tế vào bảng Shops
+        db.execute(text("UPDATE Shops SET FollowerCount = (SELECT COUNT(*) FROM Shop_Followers WHERE ShopID = Shops.ShopID)"))
+        db.commit()
+
+        print("8. Đang cập nhật Rating cho Sản phẩm và Shop...")
+        db.execute(text("""
+            UPDATE Products
+            SET Rating = ISNULL((SELECT ROUND(AVG(CAST(Rating AS DECIMAL(3,2))), 1) FROM Reviews WHERE ProductID = Products.ProductID), Rating)
+        """))
+        db.execute(text("""
+            UPDATE Shops
+            SET Rating = ISNULL((SELECT ROUND(AVG(Rating), 1) FROM Products WHERE ShopID = Shops.ShopID AND Rating > 0), 0.0)
+        """))
+        db.commit()
+
+        # 9. PHÂN BỔ 8 BẢNG GIAO DIỆN THEO CATEGORY CHÍNH XÁC
+        print("9. Đang lọc sản phẩm vào 8 bảng giao diện...")
+        
+        cats_womens = "('Chân Váy Nữ', 'Đầm Váy Nữ')" 
+        cats_mens = "('Áo Khoác Nam', 'Áo Nam', 'Quần Jeans Nam', 'Quần Âu Nam', 'Đồ Lót Nam', 'Trang Sức Nam')"
+        cats_beauty = "('Chăm Sóc Da Mặt', 'Tắm & Chăm Sóc Cơ Thể', 'Trang Điểm', 'Nước Hoa', 'Sắc Đẹp')"
+        cats_electronics = "('Điện Thoại', 'Máy Tính Bảng', 'Laptop', 'Màn Hình', 'Linh Kiện Máy Tính', 'Máy Tính Bàn', 'Loa', 'Headphone', 'Máy Game Console')"
+        cats_sports = "('Giày Thể Thao', 'Quần Áo Thể Thao', 'Phụ Kiện Thể Thao', 'Thể thao')"
+        cats_home = "('Đồ Gia Dụng Nhà Bếp', 'Đồ Gia Dụng Lớn', 'Quạt & Máy Nóng Lạnh', 'Bếp Điện', 'Thiết Bị Điện Gia Dụng')"
+
+        # 1. Bán chạy (Dựa vào ReviewCount hoặc Random)
+        db.execute(text("INSERT INTO UI_Best_Sellers (ProductID) SELECT TOP 50 ProductID FROM Products ORDER BY NEWID()"))
+        
+        # 2. Quốc Tế (Lọc địa chỉ)
+        db.execute(text("""INSERT INTO UI_International (ProductID) 
+            SELECT TOP 50 p.ProductID FROM Products p JOIN Shops s ON p.ShopID = s.ShopID JOIN Addresses a ON s.ShopID = a.UserID
+            WHERE a.Province NOT IN ('Hà Nội', 'Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'Đồng Nai', 'Bình Dương', 'Bà Rịa - Vũng Tàu', 'Thanh Hóa', 'Nghệ An', 'Thừa Thiên Huế', 'Khánh Hòa', 'Lâm Đồng')
+            ORDER BY NEWID()"""))
+            
+        # 3. Thời trang nữ
+        db.execute(text(f"""INSERT INTO UI_Womens_Fashion (ProductID)
+            SELECT TOP 50 p.ProductID 
+            FROM Products p 
+            JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID 
+            JOIN Categories c ON pcm.CategoryID = c.CategoryID
+            WHERE (c.CategoryName IN {cats_womens}) 
+               OR (p.ProductName LIKE '%Women%') 
+               OR (p.ProductName LIKE '%Nữ%')
+               OR (p.ProductName LIKE '%Váy%')
+               OR (p.ProductName LIKE '%Đầm%')
+            GROUP BY p.ProductID
+            ORDER BY NEWID()"""))
+            
+        # 4. Thời trang nam
+        db.execute(text(f"""INSERT INTO UI_Mens_Fashion (ProductID)
+            SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID
+            WHERE c.CategoryName IN {cats_mens} ORDER BY NEWID()"""))
+            
+        # 5. Làm đẹp
+        db.execute(text(f"INSERT INTO UI_Beauty (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_beauty} ORDER BY NEWID()"))
+        
+        # 6. Đồ điện tử
+        db.execute(text(f"INSERT INTO UI_Electronics (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_electronics} ORDER BY NEWID()"))
+        
+        # 7. Thể thao
+        db.execute(text(f"INSERT INTO UI_Sports (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_sports} ORDER BY NEWID()"))
+        
+        # 8. Đồ gia dụng
+        db.execute(text(f"INSERT INTO UI_Home_Appliances (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_home} ORDER BY NEWID()"))
+        
         db.commit()
 
         print(">>> HOÀN TẤT PHASE 4!")
