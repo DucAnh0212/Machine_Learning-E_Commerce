@@ -2,6 +2,8 @@
 * Chỉnh sửa logic lại seed 2 và seed 4 nhằm phục vụ việc bơm logic cho cấu trúc db mới
 * Logic ảnh tạm thời chưa hoàn thiện, sẽ hoàn thành sau 
 * 23/5 Fix lại seed 4 theo Dũng feedback
+* Tạo server cho 3 router api học máy (app/main.py)
+  Cách khởi động server: uvicorn app.main:app --reload --port 8000 (đảm bảo chạy trước 3 file học máy để tạo ra 3 file não bộ pkl trong folder ml/ trước khi bật server)
 CREATE TABLE Users (
     UserID INT IDENTITY(1,1) PRIMARY KEY,
     FullName NVARCHAR(100) NOT NULL,
