@@ -145,47 +145,54 @@ def run_phase_4():
         cats_beauty = "('Chăm Sóc Da Mặt', 'Tắm & Chăm Sóc Cơ Thể', 'Trang Điểm', 'Nước Hoa', 'Sắc Đẹp')"
         cats_electronics = "('Điện Thoại', 'Máy Tính Bảng', 'Laptop', 'Màn Hình', 'Linh Kiện Máy Tính', 'Máy Tính Bàn', 'Loa', 'Headphone', 'Máy Game Console')"
         cats_sports = "('Giày Thể Thao', 'Quần Áo Thể Thao', 'Phụ Kiện Thể Thao', 'Thể thao')"
-        cats_home = "('Đồ Gia Dụng Nhà Bếp', 'Đồ Gia Dụng Lớn', 'Quạt & Máy Nóng Lạnh', 'Bếp Điện', 'Thiết Bị Điện Gia Dụng')"
+        cats_home = "('Đồ Gia Dụng Nhà Bếp', 'Đồ Gia Dụng Lớn', 'Quạt & Máy Nóng Lạnh', 'Bếp Điện', 'Thiết Bị Điện Gia Dụng', 'Điện Máy Gia Đình', 'Quạt & Máy Nóng Lạnh', 'SAMSUNG', 'LG', 'Panasonic')"
 
-        # 1. Bán chạy (Dựa vào ReviewCount hoặc Random)
-        db.execute(text("INSERT INTO UI_Best_Sellers (ProductID) SELECT TOP 50 ProductID FROM Products ORDER BY NEWID()"))
+        # 1. Bán chạy
+        db.execute(text("INSERT INTO UI_Best_Sellers (ProductID) SELECT TOP 50 ProductID FROM Products GROUP BY ProductID ORDER BY NEWID()"))
         
-        # 2. Quốc Tế (Lọc địa chỉ)
+        # 2. Quốc Tế
         db.execute(text("""INSERT INTO UI_International (ProductID) 
             SELECT TOP 50 p.ProductID FROM Products p JOIN Shops s ON p.ShopID = s.ShopID JOIN Addresses a ON s.ShopID = a.UserID
             WHERE a.Province NOT IN ('Hà Nội', 'Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'Đồng Nai', 'Bình Dương', 'Bà Rịa - Vũng Tàu', 'Thanh Hóa', 'Nghệ An', 'Thừa Thiên Huế', 'Khánh Hòa', 'Lâm Đồng')
-            ORDER BY NEWID()"""))
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
             
         # 3. Thời trang nữ
         db.execute(text(f"""INSERT INTO UI_Womens_Fashion (ProductID)
             SELECT TOP 50 p.ProductID 
-            FROM Products p 
-            JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID 
-            JOIN Categories c ON pcm.CategoryID = c.CategoryID
-            WHERE (c.CategoryName IN {cats_womens}) 
-               OR (p.ProductName LIKE '%Women%') 
-               OR (p.ProductName LIKE '%Nữ%')
-               OR (p.ProductName LIKE '%Váy%')
-               OR (p.ProductName LIKE '%Đầm%')
-            GROUP BY p.ProductID
-            ORDER BY NEWID()"""))
+            FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID
+            WHERE (c.CategoryName IN {cats_womens}) OR (p.ProductName LIKE '%Women%') OR (p.ProductName LIKE '%Nữ%') OR (p.ProductName LIKE '%Váy%') OR (p.ProductName LIKE '%Đầm%')
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
             
         # 4. Thời trang nam
         db.execute(text(f"""INSERT INTO UI_Mens_Fashion (ProductID)
-            SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID
-            WHERE c.CategoryName IN {cats_mens} ORDER BY NEWID()"""))
+            SELECT TOP 50 p.ProductID 
+            FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID
+            WHERE (c.CategoryName IN {cats_mens}) OR (p.ProductName LIKE '%Men%') OR (p.ProductName LIKE '%Nam%') OR (p.ProductName LIKE '%Polo%') OR (p.ProductName LIKE '%Vest%')
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
             
         # 5. Làm đẹp
-        db.execute(text(f"INSERT INTO UI_Beauty (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_beauty} ORDER BY NEWID()"))
+        db.execute(text(f"""INSERT INTO UI_Beauty (ProductID) 
+            SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID 
+            WHERE (c.CategoryName IN {cats_beauty}) OR (p.ProductName LIKE '%Beauty%') OR (p.ProductName LIKE '%Skincare%') OR (p.ProductName LIKE '%Lipstick%')
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
         
         # 6. Đồ điện tử
-        db.execute(text(f"INSERT INTO UI_Electronics (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_electronics} ORDER BY NEWID()"))
+        db.execute(text(f"""INSERT INTO UI_Electronics (ProductID) 
+            SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID 
+            WHERE (c.CategoryName IN {cats_electronics}) OR (p.ProductName LIKE '%Laptop%') OR (p.ProductName LIKE '%Phone%') OR (p.ProductName LIKE '%TV%') OR (p.ProductName LIKE '%Smart%')
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
         
         # 7. Thể thao
-        db.execute(text(f"INSERT INTO UI_Sports (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_sports} ORDER BY NEWID()"))
+        db.execute(text(f"""INSERT INTO UI_Sports (ProductID) 
+            SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID 
+            WHERE (c.CategoryName IN {cats_sports}) OR (p.ProductName LIKE '%Sport%') OR (p.ProductName LIKE '%Shoes%') OR (p.ProductName LIKE '%Sneaker%')
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
         
         # 8. Đồ gia dụng
-        db.execute(text(f"INSERT INTO UI_Home_Appliances (ProductID) SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID WHERE c.CategoryName IN {cats_home} ORDER BY NEWID()"))
+        db.execute(text(f"""INSERT INTO UI_Home_Appliances (ProductID) 
+            SELECT TOP 50 p.ProductID FROM Products p JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID JOIN Categories c ON pcm.CategoryID = c.CategoryID 
+            WHERE (c.CategoryName IN {cats_home}) OR (p.ProductName LIKE '%Appliance%') OR (p.ProductName LIKE '%Fridge%') OR (p.ProductName LIKE '%Washing%')
+            GROUP BY p.ProductID ORDER BY NEWID()"""))
         
         db.commit()
 
