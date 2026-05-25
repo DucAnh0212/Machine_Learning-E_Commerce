@@ -5,6 +5,7 @@ import os
 import re
 import itertools
 import unidecode
+import uuid
 from datetime import timedelta
 from faker import Faker
 from sqlalchemy import text
@@ -236,14 +237,10 @@ def sanitize_sku_part(text_str):
 def run_phase_2():
     db = SessionLocal()
     try:
-        
         tables = ['Categories', 'Products', 'Product_Variants', 'Product_Images', 'Shops', 'Addresses', 'Tags']
         for t in tables:
-            try:
-                db.execute(text(f"DBCC CHECKIDENT ('{t}')"))
-                db.commit()
-            except:
-                db.rollback()
+            try: db.execute(text(f"DBCC CHECKIDENT ('{t}')")); db.commit()
+            except: db.rollback()
         
         user_data = db.execute(text("SELECT UserID, Phone, FullName FROM Users")).fetchall()
         user_info_map = {r[0]: {"phone": r[1], "name": r[2]} for r in user_data}
@@ -251,14 +248,13 @@ def run_phase_2():
         role_map = {r[1]: r[0] for r in db.execute(text("SELECT RoleID, RoleName FROM Roles")).fetchall()}
         tag_data = db.execute(text("SELECT TagID, TagName FROM Tags")).fetchall()
         
-        if not user_ids:
-            return
+        if not user_ids: return
 
         seller_ids = random.sample(user_ids, int(len(user_ids) * 0.1))
         shop_specialized_map = {} 
         main_cats_list = list(MAIN_CAT_TRANSLATE.keys())
 
-        # Tạo Shop
+        # 1. TẠO SHOP
         for uid in user_ids:
             db.execute(text("IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r) INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)"), {"u": uid, "r": role_map['Customer']})
             if uid in seller_ids:
@@ -271,7 +267,7 @@ def run_phase_2():
                            {"s": uid, "n": f"Cửa hàng {vn_cat_name} {fake.last_name()}", "d": f"Chuyên cung cấp {vn_cat_name} chính hãng.", "r": 0.0})
         db.commit()
         
-        # 2. TẠO VOUCHER (Logic chuẩn: ShopID)
+        # 2. TẠO VOUCHER 
         print(">>> Đang sinh Vouchers cho từng Shop và Sàn...")
         vouchers_data = []
         for sid in seller_ids:
@@ -279,31 +275,32 @@ def run_phase_2():
             for _ in range(num_vouchers):
                 discount_val = round(random.uniform(10.0, 55.0), 1)
                 prefix = random.choice(["GIAMGIA", "SALE"])
-                rounded_int = round(discount_val)
-                v_code = f"{prefix}{rounded_int}%_{fake.unique.lexify(text='????').upper()}"
+                v_code = f"{prefix}{round(discount_val)}%_{uuid.uuid4().hex[:6].upper()}"
                 start_date = fake.date_time_between(start_date='-1m', end_date='now')
                 vouchers_data.append({
                     "VoucherCode": v_code, "ShopID": sid, "VoucherType": "Shop", "DiscountValue": discount_val, 
                     "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"), 
                     "EndDate": (start_date + timedelta(days=random.randint(90, 180))).strftime("%Y-%m-%d %H:%M:%S"),
-                    "Status": "Active"
+                    "Status": "Active", "Quantity": 100, "RemainingQuantity": 100
                 })
                 
         for _ in range(150):
             discount_val = round(random.uniform(10.0, 55.0), 1)
             v_type = random.choice(['Platform', 'Shipping'])
             prefix = "FREESHIP" if v_type == 'Shipping' else random.choice(["GIAMGIA", "SALE"])
-            rounded_int = round(discount_val)
-            v_code = f"{prefix}{rounded_int}%_{fake.unique.lexify(text='????').upper()}"
+            v_code = f"{prefix}{round(discount_val)}%_{uuid.uuid4().hex[:6].upper()}"
             start_date = fake.date_time_between(start_date='-1m', end_date='now')
             vouchers_data.append({
                 "VoucherCode": v_code, "ShopID": None, "VoucherType": v_type, "DiscountValue": discount_val, 
                 "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"), 
                 "EndDate": (start_date + timedelta(days=random.randint(90, 180))).strftime("%Y-%m-%d %H:%M:%S"),
-                "Status": "Active"
+                "Status": "Active", "Quantity": 100, "RemainingQuantity": 100
             })
             
-        voucher_query = "INSERT INTO Vouchers (VoucherCode, ShopID, VoucherType, DiscountValue, StartDate, EndDate, Status) VALUES (:VoucherCode, :ShopID, :VoucherType, :DiscountValue, :StartDate, :EndDate, :Status)"
+        voucher_query = """
+            INSERT INTO Vouchers (VoucherCode, ShopID, VoucherType, DiscountValue, StartDate, EndDate, Status, Quantity, RemainingQuantity) 
+            VALUES (:VoucherCode, :ShopID, :VoucherType, :DiscountValue, :StartDate, :EndDate, :Status, :Quantity, :RemainingQuantity)
+        """
         for i in range(0, len(vouchers_data), 500):
             db.execute(text(voucher_query), vouchers_data[i:i+500])
         db.commit()
