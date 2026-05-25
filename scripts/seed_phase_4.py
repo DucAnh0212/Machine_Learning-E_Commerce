@@ -28,6 +28,14 @@ def run_phase_4():
                 """), uv)
         db.commit()
 
+        print("1.1. Đang đồng bộ số lượng Voucher còn lại...")
+        db.execute(text("""
+            UPDATE Vouchers
+            SET RemainingQuantity = Quantity - ISNULL((SELECT COUNT(*) FROM User_Vouchers WHERE VoucherID = Vouchers.VoucherID), 0)
+        """))
+        db.execute(text("UPDATE Vouchers SET RemainingQuantity = 0 WHERE RemainingQuantity < 0"))
+        db.commit()
+
         # 2. SEED BẢNG ORDER_VOUCHER (Áp dụng mã chuẩn logic)
         orders = db.execute(text("SELECT OrderID, ShopID FROM Orders")).fetchall()
         
