@@ -4,6 +4,16 @@
 * 23/5 Fix lại seed 4 theo Dũng feedback
 * Tạo server cho 3 router api học máy (app/main.py)
   Cách khởi động server: uvicorn app.main:app --reload --port 8000 (đảm bảo chạy trước 3 file học máy để tạo ra 3 file não bộ pkl trong folder ml/ trước khi bật server)
+* 25/5 cập nhật cấu trúc db, thêm cột vào voucher và review, mặc định số lượng voucher là 100, update seed 2 và seed 4 nhằm đẳm bảo số lượng voucher đã sử dụng được đồng bộ:
+ALTER TABLE Vouchers 
+ADD Quantity INT DEFAULT 100,
+    RemainingQuantity INT DEFAULT 100;
+GO
+
+ALTER TABLE Reviews 
+ADD ShopReply NVARCHAR(MAX) NULL;
+GO
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 CREATE TABLE Users (
     UserID INT IDENTITY(1,1) PRIMARY KEY,
     FullName NVARCHAR(100) NOT NULL,
