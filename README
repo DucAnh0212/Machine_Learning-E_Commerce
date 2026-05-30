@@ -13,6 +13,8 @@ GO
 ALTER TABLE Reviews 
 ADD ShopReply NVARCHAR(MAX) NULL;
 GO
+
+*30/5 thêm logic hiển thị ảnh, chỉnh sửa seed 2, xoá csdl cũ, chạy lại để đảm bảo truy cập được url ảnh
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 CREATE TABLE Users (
     UserID INT IDENTITY(1,1) PRIMARY KEY,
