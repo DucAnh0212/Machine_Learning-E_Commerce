@@ -145,7 +145,7 @@ IMAGE_PREFIX_MAP = {
     'Màn Hình': ('manhinh', 10), 'Máy Tính Bàn': ('pc', 10), 'Linh Kiện Máy Tính': ('linhkienpc', 10),
     'Điện Thoại': ('dienthoai', 10), 'Máy Tính Bảng': ('tablet', 10), 'Pin Dự Phòng': ('sacduphong', 10),
     'Thẻ Nhớ': ('thenho', 10), 'Đồ Gia Dụng Lớn': ('giadunglon', 10), 'Đồ Gia Dụng Nhà Bếp': ('giadungbep', 15),
-    'Bếp Điện': ('bepdien', 10), 'Quạt & Máy Nóng Lạnh': ('quat&maylanh', 15), 'Tivi': ('tivi', 10),
+    'Bếp Điện': ('bepdien', 10), 'Quạt & Máy Nóng Lạnh': ('quat_maylanh', 15), 'Tivi': ('tivi', 10),
     'Loa': ('loa', 10), 'Headphone': ('headphone', 10), 'Máy Game Console': ('gamingconsole', 10),
     'Phụ Kiện Thông Minh': ('phukienthongminh', 10), 'Vớ/Tất': ('tatvo', 10), 'Trang Sức Nam': ('trangsucnam', 10),
     'Giày Thể Thao': ('giaythethao', 10), 'Quần Áo Thể Thao': ('dothethao', 10), 'Phụ Kiện Thể Thao': ('phukienthethao', 10)
