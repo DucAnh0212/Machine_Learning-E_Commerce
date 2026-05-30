@@ -135,6 +135,34 @@ PRICE_RANGES = {
     'Default': (100000, 1000000)
 }
 
+BASE_CLOUD_URL = "https://res.cloudinary.com/deit0nama/image/upload"
+
+IMAGE_PREFIX_MAP = {
+    'Áo Khoác Nam': ('aokhoacnam', 10), 'Áo Nam': ('aonam', 10), 'Quần Jeans Nam': ('quanjeannam', 10),
+    'Quần Âu Nam': ('quanaunam', 10), 'Đồ Lót Nam': ('dolotnam', 10), 'Chân Váy Nữ': ('chanvaynu', 15),
+    'Đầm Váy Nữ': ('damvaynu', 15), 'Chăm Sóc Da Mặt': ('skincare', 15), 'Tắm & Chăm Sóc Cơ Thể': ('bodycare', 15),
+    'Trang Điểm': ('makeup', 10), 'Nước Hoa': ('perfume', 15), 'Laptop': ('laptop', 15),
+    'Màn Hình': ('manhinh', 10), 'Máy Tính Bàn': ('pc', 10), 'Linh Kiện Máy Tính': ('linhkienpc', 10),
+    'Điện Thoại': ('dienthoai', 10), 'Máy Tính Bảng': ('tablet', 10), 'Pin Dự Phòng': ('sacduphong', 10),
+    'Thẻ Nhớ': ('thenho', 10), 'Đồ Gia Dụng Lớn': ('giadunglon', 10), 'Đồ Gia Dụng Nhà Bếp': ('giadungbep', 15),
+    'Bếp Điện': ('bepdien', 10), 'Quạt & Máy Nóng Lạnh': ('quat&maylanh', 15), 'Tivi': ('tivi', 10),
+    'Loa': ('loa', 10), 'Headphone': ('headphone', 10), 'Máy Game Console': ('gamingconsole', 10),
+    'Phụ Kiện Thông Minh': ('phukienthongminh', 10), 'Vớ/Tất': ('tatvo', 10), 'Trang Sức Nam': ('trangsucnam', 10),
+    'Giày Thể Thao': ('giaythethao', 10), 'Quần Áo Thể Thao': ('dothethao', 10), 'Phụ Kiện Thể Thao': ('phukienthethao', 10)
+}
+
+FALLBACK_IMAGE_MAP = {
+    'Fashion': 'thoitrang_default.jpg', 'Thời Trang': 'thoitrang_default.jpg',
+    'Skincare': 'sacdep_default.jpg', 'Sắc Đẹp': 'sacdep_default.jpg',
+    'Laptops': 'laptop_default.jpg', 'Máy Tính & Laptop': 'laptop_default.jpg',
+    'Mobiles': 'dienthoai_default.jpg', 'Điện Thoại & Phụ Kiện': 'dienthoai_default.jpg',
+    'Appliances': 'giadung_default.jpg', 'Thiết Bị Điện Gia Dụng': 'giadung_default.jpg',
+    'Televisions': 'dientu_default.jpg', 'Thiết Bị Điện Tử': 'dientu_default.jpg',
+    'Electronics': 'dientu_default.jpg',
+    'Wearables': 'phukien_default.jpg', 'Phụ Kiện Thông Minh': 'phukien_default.jpg',
+    'Sports': 'thethao_default.jpg', 'Thể thao': 'thethao_default.jpg'
+}
+
 def clean_desc_conflict(text, cat):
     text = re.sub(r'\d+\s?(GB|RAM|ml|ML|inch|")', '', str(text), flags=re.IGNORECASE)
     return text.strip()
@@ -156,7 +184,8 @@ def smart_categorize(product_name, main_cat):
     
     if main_cat == 'Sports':
         if any(k in name_lower for k in ['shoe', 'sneaker', 'giày', 'footwear']): return 'Giày Thể Thao'
-        if any(k in name_lower for k in ['bag', 'bottle', 'phụ kiện', 'túi', 'kính', 'vợt', 'bóng']): return 'Phụ Kiện Thể Thao'
+        if any(k in name_lower for k in ['sock', 'tất', 'vớ']): return 'Vớ/Tất' 
+        if any(k in name_lower for k in ['bag', 'bottle', 'phụ kiện', 'túi', 'kính', 'vợt', 'bóng', 'thảm', 'balo']): return 'Phụ Kiện Thể Thao'
         return 'Quần Áo Thể Thao'
     elif main_cat == 'Mobiles':
         if any(k in name_lower for k in ['cable', 'charger', 'sạc', 'cáp', 'power bank', 'dự phòng', 'adapter']): return 'Pin Dự Phòng'
@@ -459,9 +488,20 @@ def run_phase_2():
             for tid in final_tags:
                 db.execute(text("INSERT INTO Product_Tag_Map (ProductID, TagID) VALUES (:p, :t)"), {"p": pid, "t": tid})
 
-            db.execute(text("INSERT INTO Product_Images (ProductID, ImageURL, IsMain) VALUES (:p, :u, 1)"), 
-                       {"p": pid, "u": f"https://picsum.photos/seed/{pid}{main_cat}/600/600"})
+            #LOGIC GẮN ẢNH THÔNG MINH
+            image_config = IMAGE_PREFIX_MAP.get(sub_cat_vn)
+            
+            if image_config:
+                prefix, max_images = image_config
+                random_index = random.randint(1, max_images)
+                final_image_url = f"{BASE_CLOUD_URL}/{prefix}_{random_index}.jpg"
+            else:
+                fallback_filename = FALLBACK_IMAGE_MAP.get(main_cat, 'default_product.jpg')
+                final_image_url = f"{BASE_CLOUD_URL}/{fallback_filename}"
 
+            # Lưu URL Public vào CSDL
+            db.execute(text("INSERT INTO Product_Images (ProductID, ImageURL, IsMain) VALUES (:p, :u, 1)"), 
+                       {"p": pid, "u": final_image_url})
         db.commit()
         print(">>> HOÀN THÀNH PHASE 2!")
     except Exception as e:
