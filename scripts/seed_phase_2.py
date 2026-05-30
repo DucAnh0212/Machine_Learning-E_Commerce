@@ -148,7 +148,7 @@ IMAGE_PREFIX_MAP = {
     'Bếp Điện': ('bepdien', 10), 'Quạt & Máy Nóng Lạnh': ('quat_maylanh', 15), 'Tivi': ('tivi', 10),
     'Loa': ('loa', 10), 'Headphone': ('headphone', 10), 'Máy Game Console': ('gamingconsole', 10),
     'Phụ Kiện Thông Minh': ('phukienthongminh', 10), 'Vớ/Tất': ('tatvo', 10), 'Trang Sức Nam': ('trangsucnam', 10),
-    'Giày Thể Thao': ('giaythethao', 10), 'Quần Áo Thể Thao': ('dothethao', 10), 'Phụ Kiện Thể Thao': ('phukienthethao', 10)
+    'Giày Thể Thao': ('giaythetheo', 10), 'Quần Áo Thể Thao': ('dothethao', 10), 'Phụ Kiện Thể Thao': ('phukienthethao', 10)
 }
 
 FALLBACK_IMAGE_MAP = {
